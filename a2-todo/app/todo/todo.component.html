@@ -1,0 +1,1 @@
+<header>Todo</header><div *ngIf="items.length === 0" class="empty">nothing to todo</div><todo-detail *ngFor="let item of items" class="list-group-item" [item]="item" (edit)="onItemEdit($event)" (delete)="onItemDelete($event)"></todo-detail><todo-add (add)="onItemAdd($event)"></todo-add>
