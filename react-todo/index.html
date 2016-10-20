@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>React Todo</title>
+        <style>
+            body {
+                font-family: sans-serif;
+                margin: 0;
+            }
+            .todo-app {
+                margin: 20px auto;
+                max-width: 400px;
+                text-align: center;
+            }
+            .todo-app input[type="text"] {
+                margin: 0 5px;
+            }
+            .todo-detail input:checked + input[type="text"] {
+                color: green;
+                font-weight: bold;
+                text-decoration: line-through;
+            }
+            .todo-list {
+                margin: 20px 0;
+            }
+            .todo-list .empty {
+                color: silver;
+                font-size: 14px;
+            }
+        </style>
+    </head>
+    <body>
+
+        <div id="app"></div>
+        <script src="bundle.js"></script>
+
+    </body>
+</html>
