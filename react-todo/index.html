@@ -29,6 +29,21 @@
                 color: silver;
                 font-size: 14px;
             }
+            /* Animation classes */
+            .item-enter {
+                opacity: 0;
+            }
+            .item-enter.item-enter-active {
+                opacity: 1;
+                transition: opacity 0.2s linear;
+            }
+            .item-leave {
+                opacity: 1;
+            }
+            .item-leave.item-leave-active {
+                opacity: 0;
+                transition: opacity 0.2s linear;
+            }
         </style>
     </head>
     <body>
