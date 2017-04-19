@@ -1,7 +1,9 @@
 
 (function($) {
 
-    // ===== Plugin =====
+    /**
+     * Plugin
+     */
 
     $.fn.imagesGrid = function(options) {
 
@@ -9,21 +11,33 @@
 
         return this.each(function() {
 
+            // If options is plain object - destroy previous instance and create new
             if ($.isPlainObject(options)) {
-                // Create ImagesGrid
+                
+                if (this._imgGrid instanceof ImagesGrid) {
+                    this._imgGrid.destroy();
+                    delete this._imgGrid;
+                }
+
                 var opts = $.extend({}, $.fn.imagesGrid.defaults, options);
                 opts.element = $(this);
                 this._imgGrid = new ImagesGrid(opts);
+
                 return;
             }
 
-            if (this._imgGrid instanceof ImagesGrid) {
+            // If options is string - execute method
+            if (typeof options === 'string' && this._imgGrid instanceof ImagesGrid) {
                 switch (options) {
                     case 'modal.open':
                         this._imgGrid.modal.open(args[1]);
                         break;
                     case 'modal.close':
                         this._imgGrid.modal.close();
+                        break;
+                    case 'destroy':
+                        this._imgGrid.destroy();
+                        delete this._imgGrid;
                         break;
                 }
             }
@@ -32,13 +46,17 @@
 
     };
 
-    // ===== Plugin default options =====
+    /**
+     * Plugin default options
+     */
 
     $.fn.imagesGrid.defaults = {
         images: [],
         cells: 5,
         align: false,
         nextOnClick: true,
+        showViewAll: 'more',
+        viewAllStartIndex: 'auto',
         getViewAllText: function(imagesCount) {
             return 'View all ' + imagesCount + ' images';
         },
@@ -48,24 +66,29 @@
         onGridImageLoaded: $.noop,
         onModalOpen: $.noop,
         onModalClose: $.noop,
-        onModalImageClick: $.noop
+        onModalImageClick: $.noop,
+        onModalImageUpdate: $.noop
     };
 
-    // ===== ImagesGrid =====
+    /**
+     * ImagesGrid
+     *   opts                    - Grid options 
+     *   opts.element            - Element where to render images grid
+     *   opts.images             - Array of images. Array item can be string or object { src, alt, title, caption, thumbnail }
+     *   opts.align              - Align images with different height
+     *   opts.cells              - Maximum number of cells (from 1 to 6)
+     *   opts.showViewAll        - Show view all text:
+     *                                'more'   - show if number of images greater than number of cells
+     *                                'always' - always show
+     *                                false    - never show
+     *   opts.viewAllStartIndex  - Start image index when view all link clicked
+     *   opts.getViewAllText     - Callback function returns text for "view all images" link
+     *   opts.onGridRendered     - Callback function fired when grid items added to the DOM
+     *   opts.onGridItemRendered - Callback function fired when grid item added to the DOM
+     *   opts.onGridLoaded       - Callback function fired when grid images loaded
+     *   opts.onGridImageLoaded  - Callback function fired when grid image loaded
+     */
 
-    /*
-      ImagesGrid constructor
-        opts         - Options
-        opts.element - jQuery element
-        opts.images  - Array of images urls of images option objects
-        opts.align   - Aling diff-size images
-        opts.cells   - Max grid cells (1-6)
-        opts.getViewAllText     - Returns text for "view all images" link,
-        opts.onGridRendered     - Called when grid items added to the DOM
-        opts.onGridItemRendered - Called when grid item added to the DOM
-        opts.onGridLoaded       - Called when grid images loaded
-        opts.onGridImageLoaded  - Called when grid image loaded
-    */
     function ImagesGrid(opts) {
 
         this.opts = opts || {};
@@ -80,19 +103,22 @@
         var cells = this.opts.cells;
         this.opts.cells = (cells < 1)? 1: (cells > 6)? 6: cells;
 
+        this.onWindowResize = this.onWindowResize.bind(this);
+        this.onImageClick = this.onImageClick.bind(this);
+
         this.init();
     }
 
     ImagesGrid.prototype.init = function()  {
 
-        this.applyGridClass();
+        this.setGridClass();
         this.renderGridItems();
-        this.initModal();
+        this.createModal();
 
-        this.$window.on('resize', this.onWinResize.bind(this));
-    };
+        this.$window.on('resize', this.onWindowResize);
+    }
 
-    ImagesGrid.prototype.initModal = function() {
+    ImagesGrid.prototype.createModal = function() {
 
         var opts = this.opts;
 
@@ -101,25 +127,19 @@
             nextOnClick: opts.nextOnClick,
             onModalOpen: opts.onModalOpen,
             onModalClose: opts.onModalClose,
-            onModalImageClick: opts.onModalImageClick
+            onModalImageClick: opts.onModalImageClick,
+            onModalImageUpdate: opts.onModalImageUpdate
         });
-    };
+    }
 
-    ImagesGrid.prototype.applyGridClass = function() {
-
-        // Remove previous grid class
-        this.$element.removeClass(function(index, classNames) {
-            if (/(imgs-grid-\d)/.test(classNames)) {
-                return RegExp.$1;
-            }
-        });
+    ImagesGrid.prototype.setGridClass = function() {
 
         var opts = this.opts,
             imgsLen = opts.images.length,
             cellsCount = (imgsLen < opts.cells)? imgsLen: opts.cells;
 
         this.$element.addClass('imgs-grid imgs-grid-' + cellsCount);
-    };
+    }
 
     ImagesGrid.prototype.renderGridItems = function() {
 
@@ -135,35 +155,38 @@
         this.$gridItems = [];
 
         for (var i = 0; i < imgsLen; ++i) {
-            if (i == opts.cells) {
+            if (i === opts.cells) {
                 break;
             }
             this.renderGridItem(imgs[i], i);
         }
 
-        if (imgsLen > opts.cells) {
+        if (opts.showViewAll === 'always' || 
+            (opts.showViewAll === 'more' && imgsLen > opts.cells)
+        ) {
             this.renderViewAll();
         }
 
         opts.onGridRendered(this.$element);
-    };
+    }
 
     ImagesGrid.prototype.renderGridItem = function(image, index) {
 
         var src = image,
             alt = '',
             title = '',
-            opts = this.opts;
+            opts = this.opts,
+            _this = this;
 
         if ($.isPlainObject(image)) {
-            src = image.src;
+            src = image.thumbnail || image.src;
             alt = image.alt || '';
             title = image.title || '';
         }
 
         var item = $('<div>', {
             class: 'imgs-grid-image',
-            click: this.onImageClick.bind(this),
+            click: this.onImageClick,
             data: { index: index }
         });
 
@@ -175,9 +198,11 @@
                     src: src,
                     alt: alt,
                     title: title,
-                    load: function(event) {
-                        this.onImageLoaded(event, $(this), image);
-                    }.bind(this)
+                    on: {
+                        load: function(event) {
+                            _this.onImageLoaded(event, $(this), image);
+                        }
+                    }
                 })
             )
         );
@@ -186,7 +211,7 @@
         this.$element.append(item);
 
         opts.onGridItemRendered(item, image);
-    };
+    }
 
     ImagesGrid.prototype.renderViewAll = function() {
 
@@ -205,18 +230,29 @@
                 })
             )
         );
-    };
+    }
 
-    ImagesGrid.prototype.onWinResize = function(event) {
+    ImagesGrid.prototype.onWindowResize = function(event) {
         if (this.opts.align) {
             this.align();
         }
-    };
+    }
 
     ImagesGrid.prototype.onImageClick = function(event) {
-        var imageIndex = $(event.currentTarget).data('index');
+
+        var opts = this.opts,
+            img = $(event.currentTarget),
+            imageIndex;
+
+        if (img.find('.view-all').length > 0 &&
+            typeof opts.viewAllStartIndex === 'number' ) {
+            imageIndex = opts.viewAllStartIndex;
+        } else {
+            imageIndex = img.data('index');
+        }
+
         this.modal.open(imageIndex);
-    };
+    }
 
     ImagesGrid.prototype.onImageLoaded = function(event, imageEl, image) {
 
@@ -226,11 +262,11 @@
 
         opts.onGridImageLoaded(event, imageEl, image);
 
-        if (this.imageLoadCount == this.$gridItems.length) {
+        if (this.imageLoadCount === this.$gridItems.length) {
             this.imageLoadCount = 0;
             this.onAllImagesLoaded()
         }
-    };
+    }
 
     ImagesGrid.prototype.onAllImagesLoaded = function() {
 
@@ -241,7 +277,7 @@
         }
 
         opts.onGridLoaded(this.$element);
-    };
+    }
 
     ImagesGrid.prototype.align = function() {
 
@@ -262,7 +298,7 @@
                 this.alignItems(this.$gridItems.slice(3));
                 break;
         }
-    };
+    }
 
     ImagesGrid.prototype.alignItems = function(items) {
 
@@ -270,7 +306,7 @@
             return item.find('img').height();
         });
 
-        var itemHeight = Math.min.apply(null, itemsHeight);
+        var normalizedHeight = Math.min.apply(null, itemsHeight);
 
         $(items).each(function() {
 
@@ -279,25 +315,35 @@
                 img = item.find('img'),
                 imgHeight = img.height();
 
-            imgWrap.height(itemHeight);
+            imgWrap.height(normalizedHeight);
 
-            if (imgHeight > itemHeight) {
-                var top = Math.floor((imgHeight - itemHeight) / 2);
+            if (imgHeight > normalizedHeight) {
+                var top = Math.floor((imgHeight - normalizedHeight) / 2);
                 img.css({ top: -top });
             }
-
         });
-    };
+    }
 
-    /*
-      ImagesGridModal constructor
-        opts             - Options
-        opts.images      - Array of string or objects
-        opts.nextOnClick - Show next image when click on modal image
-        opts.onModalOpen       - Called when modal opened
-        opts.onModalClose      - Called when modal closed
-        opts.onModalImageClick - Called on modal image click
-    */
+    ImagesGrid.prototype.destroy = function() {
+
+        this.$window.off('resize',this.onWindowResize);
+
+        this.$element.empty()
+            .removeClass('imgs-grid imgs-grid-' + this.$gridItems.length);
+
+        this.modal.destroy();
+    }
+
+    /**
+     * ImagesGridModal 
+     *  opts                    - Modal options
+     *  opts.images             - Array of images
+     *  opts.nextOnClick        - Show next image when click on modal image
+     *  opts.onModalOpen        - Callback function called when modal opened
+     *  opts.onModalClose       - Callback function called when modal closed
+     *  opts.onModalImageClick  - Callback function called on modal image click
+     */
+
     function ImagesGridModal(opts) {
 
         this.opts = opts || {};
@@ -307,17 +353,26 @@
         this.$document = $(document);
         this.$modal = null;
         this.$indicator = null;
+
+        this.close = this.close.bind(this);
+        this.prev = this.prev.bind(this);
+        this.next = this.next.bind(this);
+        this.onIndicatorClick = this.onIndicatorClick.bind(this);
+        this.onImageLoaded = this.onImageLoaded.bind(this);
+        this.onKeyUp = this.onKeyUp.bind(this);
+
+        this.$document.on('keyup', this.onKeyUp);
     }
 
     ImagesGridModal.prototype.open = function(imageIndex) {
 
-        if (this.$modal && this.$modal.is(':visible')) {
+        if (this.isOpened()) {
             return;
         }
 
         this.imageIndex = parseInt(imageIndex) || 0;
         this.render();
-    };
+    }
 
     ImagesGridModal.prototype.close = function(event) {
 
@@ -339,9 +394,11 @@
                 opts.onModalClose();
             }.bind(this)
         });
+    }
 
-        this.$document.off('keyup', this.onKeyUp);
-    };
+    ImagesGridModal.prototype.isOpened = function() {
+        return (this.$modal && this.$modal.is(':visible'));
+    }
 
     ImagesGridModal.prototype.render = function() {
 
@@ -353,38 +410,35 @@
         this.renderInnerContainer();
         this.renderIndicatorContainer();
 
-        this.onKeyUp = this.onKeyUp.bind(this);
-        this.$document.on('keyup', this.onKeyUp);
-
         this.$modal.animate({
             opacity: 1
         }, {
             duration: 100,
             complete: function() {
-                opts.onModalOpen(this.$modal);
+                opts.onModalOpen(this.$modal, opts.images[this.imageIndex]);
             }.bind(this)
         });
-    };
+    }
 
     ImagesGridModal.prototype.renderModal = function() {
         this.$modal = $('<div>', {
             class: 'imgs-grid-modal'
         }).appendTo('body');
-    };
+    }
 
     ImagesGridModal.prototype.renderCaption = function() {
         this.$caption = $('<div>', {
             class: 'modal-caption',
             text: this.getImageCaption(this.imageIndex)
         }).appendTo(this.$modal);
-    };
+    }
 
     ImagesGridModal.prototype.renderCloseButton = function() {
         this.$modal.append($('<div>', {
             class: 'modal-close',
-            click: this.close.bind(this)
+            click: this.close
         }));
-    };
+    }
 
     ImagesGridModal.prototype.renderInnerContainer = function() {
 
@@ -402,10 +456,12 @@
                         src: image.src,
                         alt: image.alt,
                         title: image.title,
-                        load: this.onImageLoaded.bind(this),
-                        click: function(event) {
-                            this.onImageClick(event, $(this), image);
-                        }.bind(this)
+                        on: {
+                            load: this.onImageLoaded,
+                            click: function(event) {
+                                this.onImageClick(event, $(this), image);
+                            }.bind(this)
+                        }
                     }),
                     $('<div>', {
                         class: 'modal-loader',
@@ -414,7 +470,7 @@
                 ),
                 $('<div>', {
                     class: 'modal-control left',
-                    click: this.prev.bind(this)
+                    click: this.prev
                 }).append(
                     $('<div>', {
                         class: 'arrow left'
@@ -422,7 +478,7 @@
                 ),
                 $('<div>', {
                     class: 'modal-control right',
-                    click: this.next.bind(this)
+                    click: this.next
                 }).append(
                     $('<div>', {
                         class: 'arrow right'
@@ -434,7 +490,7 @@
         if (opts.images.length <= 1) {
             this.$modal.find('.modal-control').hide();
         }
-    };
+    }
 
     ImagesGridModal.prototype.renderIndicatorContainer = function() {
 
@@ -453,14 +509,14 @@
         for (i = 0; i < imgsLen; ++i) {
             list.append($('<li>', {
                 class: this.imageIndex == i? 'selected': '',
-                click: this.indicatorClick.bind(this),
+                click: this.onIndicatorClick,
                 data: { index: i }
             }));
         }
 
         this.$indicator.append(list);
         this.$modal.append(this.$indicator);
-    };
+    }
 
     ImagesGridModal.prototype.prev = function() {
 
@@ -473,7 +529,7 @@
         }
 
         this.updateImage();
-    };
+    }
 
     ImagesGridModal.prototype.next = function() {
 
@@ -486,13 +542,15 @@
         }
 
         this.updateImage();
-    };
+    }
 
     ImagesGridModal.prototype.updateImage = function() {
 
-        var image = this.getImage(this.imageIndex);
+        var opts = this.opts,
+            image = this.getImage(this.imageIndex),
+            imageEl = this.$modal.find('.modal-image img');
 
-        this.$modal.find('.modal-image img').attr({
+        imageEl.attr({
             src: image.src,
             alt: image.alt,
             title: image.title
@@ -508,7 +566,9 @@
         }
 
         this.showLoader();
-    };
+
+        opts.onModalImageUpdate(imageEl, image);
+    }
 
     ImagesGridModal.prototype.onImageClick = function(event, imageEl, image) {
 
@@ -519,17 +579,17 @@
         }
 
         opts.onModalImageClick(event, imageEl, image);
-    };
+    }
 
     ImagesGridModal.prototype.onImageLoaded = function() {
         this.hideLoader();
-    };
+    }
 
-    ImagesGridModal.prototype.indicatorClick = function(event) {
+    ImagesGridModal.prototype.onIndicatorClick = function(event) {
         var index = $(event.target).data('index');
         this.imageIndex = index;
         this.updateImage();
-    };
+    }
 
     ImagesGridModal.prototype.onKeyUp = function(event) {
 
@@ -548,7 +608,7 @@
                 this.next();
                 break;
         }
-    };
+    }
 
     ImagesGridModal.prototype.getImage = function(index) {
 
@@ -560,25 +620,30 @@
         } else {
             return { src: image, alt: '', title: '' }
         }
-    };
+    }
 
     ImagesGridModal.prototype.getImageCaption = function(imgIndex) {
         var img = this.getImage(imgIndex);
         return img.caption || '';
-    };
+    }
 
     ImagesGridModal.prototype.showLoader = function() {
         if (this.$modal) {
             this.$modal.find('.modal-image img').hide();
             this.$modal.find('.modal-loader').show();
         }
-    };
+    }
 
     ImagesGridModal.prototype.hideLoader = function() {
         if (this.$modal) {
             this.$modal.find('.modal-image img').show();
             this.$modal.find('.modal-loader').hide();
         }
-    };
+    }
+
+    ImagesGridModal.prototype.destroy = function() {
+        this.$document.off('keyup', this.onKeyUp);
+        this.close();
+    }
 
 })(jQuery);
