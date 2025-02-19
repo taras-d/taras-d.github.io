@@ -14,6 +14,7 @@
     <title>Hobby projects | Taras Datsenko</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/favicon.png">
 
     <style>
       :root {
@@ -46,6 +47,7 @@
         flex-direction: column;
         border: 1px solid var(--card-border-color);
         border-radius: var(--card-border-radius);
+        box-shadow: 0 0 2px 0px var(--card-border-color)
       }
       .card-header {
         border-bottom: 1px solid var(--card-border-color);
@@ -63,10 +65,11 @@
       /* Card grid */
       .card-grid {
         display: grid;
-        grid-template-columns: repeat(2, minmax(auto, 600px));
+        grid-template-columns: repeat(2, 1fr);
         justify-content: center;
         gap: 20px;
-        margin-bottom: 20px;
+        margin: 0 auto 20px;
+        max-width: 1200px;
       }
       @media (max-width: 800px) {
         .card-grid {
@@ -159,13 +162,13 @@
 
     <div class="card-grid" id="recent-projects"></div>
 
-    <header class="section-header">Older projects</header>
+    <header class="section-header">Old projects</header>
 
-    <div class="card-grid" id="older-projects"></div>
+    <div class="card-grid" id="old-projects"></div>
 
     <script>
       const recentProjectsEl = document.querySelector("#recent-projects");
-      const olderProjectsEl = document.querySelector("#older-projects");
+      const oldProjectsEl = document.querySelector("#old-projects");
       const projectTemplateEl = document.querySelector("#project-template");
 
       // Recent projects
@@ -186,7 +189,7 @@
         }
       ].forEach(item => renderProject(item, recentProjectsEl));
 
-      // Older projects
+      // Old projects
       [
         {
           name: "Images grid jQuery plugin",
@@ -196,14 +199,14 @@
           previewImg: "/preview/images-grid.png",
         },
         {
-          name: "Breakout game",
+          name: "Breakout",
           libs: ["TypeScript", "HTML"],
           demoLink: "/demo/breakout/",
           repoLink: "https://github.com/taras-d/breakout/",
           previewImg: "/preview/breakout.png",
         },
         {
-          name: "Shooting range game",
+          name: "Shooting range",
           libs: ["TypeScript", "HTML"],
           demoLink: "/demo/shooting-range/",
           repoLink: "https://github.com/taras-d/shooting-range/",
@@ -216,7 +219,7 @@
           repoLink: "https://github.com/taras-d/sudoku/",
           previewImg: "/preview/sudoku.png",
         }
-      ].forEach(item => renderProject(item, olderProjectsEl));
+      ].forEach(item => renderProject(item, oldProjectsEl));
 
       function renderProject(params, parent) {
         const fragment = projectTemplateEl.content.cloneNode(true);
